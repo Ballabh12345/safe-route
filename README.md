@@ -9,7 +9,9 @@ npm install
 npm run dev
 ```
 
-## Deploy to Vercel
+## Optional routing
+
+Safe Route uses OpenStreetMap and Carto tiles by default. To draw real road routes instead of straight-line estimates, create a free OpenRouteService API key and paste it into **Your settings → Free routing API key**. The key is stored only in this browser.
 
 ```bash
 npm run deploy        # preview deployment

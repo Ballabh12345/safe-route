@@ -1,0 +1,20 @@
+{
+  "name": "Safe Route — Journey companion",
+  "short_name": "Safe Route",
+  "description": "Share your journey, check in on time, and keep trusted contacts informed.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0608",
+  "theme_color": "#0b0608",
+  "categories": ["safety", "travel", "lifestyle"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

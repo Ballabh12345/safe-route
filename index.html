@@ -4,12 +4,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0608">
+  <meta name="color-scheme" content="dark">
   <meta name="description" content="Safe Route is a personal safety companion for sharing journeys, checking in, and keeping trusted contacts informed.">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="manifest" href="./site.webmanifest">
+  <link rel="apple-touch-icon" href="./favicon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Safe Route">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Safe Route">
+  <meta property="og:title" content="Safe Route — Your journey, watched over">
+  <meta property="og:description" content="Share your journey, check in on time, and keep trusted contacts informed.">
+  <meta property="og:image" content="./og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Safe Route — Your journey, watched over">
+  <meta name="twitter:description" content="Share your journey, check in on time, and keep trusted contacts informed.">
+  <meta name="twitter:image" content="./og-image.png">
   <title>Safe Route — Your journey, watched over</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body>
   <div class="ambient" aria-hidden="true"></div>
@@ -74,7 +93,7 @@
 
       <div class="dashboard">
         <div class="main-column">
-          <article class="panel journey-panel" id="journey" aria-live="polite">
+          <article class="panel journey-panel" id="journey">
             <div class="journey-head">
               <div class="journey-flag">
                 <span class="live-dot" id="journeyDot"></span>
@@ -87,7 +106,7 @@
               </div>
             </div>
 
-            <div class="journey-notice" id="journeyNotice" hidden></div>
+            <div class="journey-notice" id="journeyNotice" role="status" aria-live="polite" hidden></div>
 
             <div class="journey-active" id="journeyActive">
               <div class="journey-grid">
@@ -130,29 +149,9 @@
                   </div>
                 </div>
 
-                <div class="route-map" aria-label="Stylised route map">
-                  <div class="map-grid" aria-hidden="true"></div>
-                  <svg class="map-svg" viewBox="0 0 620 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                    <g class="map-streets">
-                      <path d="M-40 70 C 100 90, 160 20, 300 55 S 490 100, 680 35"/>
-                      <path d="M-20 150 C 100 120, 230 195, 330 150 S 500 110, 660 160"/>
-                      <path d="M80 -20 C 70 100, 150 180, 140 360"/>
-                      <path d="M270 -20 C 290 90, 220 200, 260 360"/>
-                      <path d="M450 -30 C 420 80, 500 210, 440 370"/>
-                      <path d="M-40 260 C 130 220, 230 310, 360 260 S 550 220, 680 285"/>
-                      <path d="M560 -20 C 540 90, 600 160, 570 360"/>
-                    </g>
-                    <path class="route-base" d="M70 278 C 140 278, 160 230, 225 220 S 305 265, 348 214 S 380 129, 466 120 S 515 77, 560 66" pathLength="100"/>
-                    <path class="route-progress" id="routeProgress" d="M70 278 C 140 278, 160 230, 225 220 S 305 265, 348 214 S 380 129, 466 120 S 515 77, 560 66" pathLength="100"/>
-                    <circle class="route-waypoint" cx="70" cy="278" r="5"/>
-                    <circle class="route-waypoint" cx="560" cy="66" r="6"/>
-                    <circle class="route-pulse" id="routePulse" cx="348" cy="214" r="18"/>
-                    <circle class="route-dot" id="routeDot" cx="348" cy="214" r="8"/>
-                  </svg>
-                  <span class="map-label map-label-origin">Hawthorne Ave</span>
-                  <span class="map-label map-label-dest">Riverside Station</span>
+                <div class="route-map" aria-label="Live route map">
+                  <div id="journeyMap" class="journey-map"></div>
                   <span class="map-chip"><span class="status-dot"></span><span id="mapChipText">On track</span></span>
-                  <span class="map-compass" aria-hidden="true">N<span>↑</span></span>
                 </div>
               </div>
 
@@ -191,7 +190,10 @@
                 <p class="eyebrow">Safety history</p>
                 <h2 id="activityTitle">Every check, logged.</h2>
               </div>
-              <span class="event-count" id="activityCount">04 events</span>
+              <div class="activity-head-actions">
+                <span class="event-count" id="activityCount">04 events</span>
+                <button class="text-button" type="button" id="viewAllActivityButton">View all</button>
+              </div>
             </div>
             <div class="activity-list" id="activityList"></div>
           </section>
@@ -246,11 +248,11 @@
                 <span class="toolkit-copy"><strong>Message Maya</strong><small>Send a quick safety check</small></span>
                 <svg class="toolkit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
               </a>
-              <a class="toolkit-row" href="tel:112">
+              <a class="toolkit-row" id="toolkitEmergencyCall" href="tel:112">
                 <span class="toolkit-icon toolkit-icon-alert">
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 19 18H1L10 2Z"/><path d="M10 7v5M10 15.2v.1"/></svg>
                 </span>
-                <span class="toolkit-copy"><strong>Local emergency line</strong><small>Call 112 · always available</small></span>
+                <span class="toolkit-copy"><strong>Local emergency line</strong><small>Call <span id="toolkitEmergencyNumber">112</span> · always available</small></span>
                 <svg class="toolkit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
               </a>
             </div>

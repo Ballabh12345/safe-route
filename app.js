@@ -7,7 +7,7 @@
 
   const MINUTE = 60 * 1000;
   const STORAGE_KEY = "safe-route-v1";
-  const EMERGENCY_NUMBER = "112";
+  const DEFAULT_EMERGENCY_NUMBER = "112";
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -110,6 +110,15 @@
     return cleaned || "+112";
   }
 
+  function sanitizeEmergencyNumber(value) {
+    const cleaned = String(value ?? "").replace(/[^\d+]/g, "").slice(0, 8);
+    return cleaned || DEFAULT_EMERGENCY_NUMBER;
+  }
+
+  function getRoutingApiKey() {
+    return String(state?.routingApiKey || "").trim();
+  }
+
   function formatTime(timestamp) {
     const date = new Date(Number(timestamp));
     if (Number.isNaN(date.getTime())) return "--:--";
@@ -195,6 +204,8 @@
       demo: true,
       status: "active",
       overdueLogged: false,
+      originCoords: { lat: 28.4744, lng: 77.504 },
+      destinationCoords: { lat: 28.4595, lng: 77.508 },
     };
     const activities = [
       {
@@ -235,6 +246,8 @@
       version: 1,
       user: { name: "Alex Rivera" },
       contact,
+      emergencyNumber: "112",
+      routingApiKey: "",
       journey,
       activities,
       createdAt: now,
@@ -248,8 +261,11 @@
       const parsed = JSON.parse(raw);
       if (!parsed || parsed.version !== 1) return null;
       if (!parsed.contact) parsed.contact = createDemoState().contact;
+      if (!parsed.activities) parsed.activities = [];
       if (!Array.isArray(parsed.activities)) parsed.activities = [];
       if (!parsed.user) parsed.user = { name: "Alex Rivera" };
+      if (!parsed.emergencyNumber) parsed.emergencyNumber = DEFAULT_EMERGENCY_NUMBER;
+      if (!parsed.routingApiKey) parsed.routingApiKey = "";
       return parsed;
     } catch {
       return null;
@@ -359,6 +375,14 @@
     if (textContact) textContact.dataset.phone = phone;
   }
 
+  function applyEmergencyLinks() {
+    const emergencyNumber = getEmergencyNumber();
+    const callLink = $("#toolkitEmergencyCall");
+    const numberLabel = $("#toolkitEmergencyNumber");
+    if (callLink) callLink.href = `tel:${emergencyNumber}`;
+    if (numberLabel) numberLabel.textContent = emergencyNumber;
+  }
+
   function renderContact() {
     if (!state?.contact) return;
     const contact = state.contact;
@@ -432,43 +456,6 @@
     renderSystemState(status.key);
   }
 
-  function updateRouteMap(progress, statusKey) {
-    const path = $("#routeProgress");
-    const dot = $("#routeDot");
-    const pulse = $("#routePulse");
-    const chip = $(".map-chip");
-    const chipText = $("#mapChipText");
-    if (!path || !dot || !pulse) return;
-
-    const safeProgress = clamp(progress, 0, 1);
-    path.style.strokeDasharray = "100 100";
-    path.style.strokeDashoffset = String(100 - safeProgress * 100);
-
-    try {
-      const total = path.getTotalLength();
-      const point = path.getPointAtLength(total * safeProgress);
-      dot.setAttribute("cx", point.x);
-      dot.setAttribute("cy", point.y);
-      pulse.setAttribute("cx", point.x);
-      pulse.setAttribute("cy", point.y);
-    } catch {
-      /* SVG geometry is unavailable only in unusual environments. */
-    }
-
-    if (chip && chipText) {
-      chip.classList.remove("is-warn", "is-alert");
-      if (statusKey === "due") {
-        chip.classList.add("is-warn");
-        chipText.textContent = "Check-in due";
-      } else if (statusKey === "overdue") {
-        chip.classList.add("is-alert");
-        chipText.textContent = "Check in now";
-      } else {
-        chipText.textContent = safeProgress > 0.82 ? "Almost there" : "On track";
-      }
-    }
-  }
-
   function updateJourneyLiveFields(status) {
     if (!state?.journey) return;
     const now = Date.now();
@@ -513,7 +500,272 @@
     const duration = Math.max(1, journey.expectedAt - journey.startedAt);
     const progress = clamp((now - journey.startedAt) / duration, 0, 1);
     if (progressBar) progressBar.style.width = `${Math.round(progress * 100)}%`;
-    updateRouteMap(progress, status.key);
+    updateMapChip(status.key);
+  }
+
+  /* ---------- Real map ---------- */
+
+  const DEFAULT_MAP_CENTER = { lat: 28.4744, lng: 77.504 };
+  let journeyMap = null;
+  let journeyMapMarkers = [];
+  let journeyMapRoute = null;
+  let journeyMapUserMarker = null;
+  let journeyMapUpdating = false;
+
+  function cleanupJourneyMap() {
+    if (journeyMap) {
+      journeyMap.remove();
+      journeyMap = null;
+    }
+    journeyMapMarkers = [];
+    journeyMapRoute = null;
+    journeyMapUserMarker = null;
+  }
+
+  let watchMap = null;
+
+  function cleanupWatchMap() {
+    if (watchMap) {
+      watchMap.remove();
+      watchMap = null;
+    }
+  }
+
+  async function initWatchMap() {
+    if (!watchData || !window.L) return;
+    const container = document.getElementById("watchMap");
+    if (!container || watchMap) return;
+
+    const fallback = { lat: DEFAULT_MAP_CENTER.lat, lng: DEFAULT_MAP_CENTER.lng };
+    let origin = watchData.originCoords || null;
+    let destination = watchData.destinationCoords || null;
+
+    if (!origin) origin = fallback;
+    if (!destination) {
+      const found = await geocodePlace(watchData.destination);
+      destination = found || { lat: origin.lat + 0.035, lng: origin.lng + 0.045 };
+    }
+
+    watchMap = L.map(container, { zoomControl: false, attributionControl: true }).setView(
+      [origin.lat, origin.lng],
+      12
+    );
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+      subdomains: "abcd",
+      maxZoom: 20,
+    }).addTo(watchMap);
+
+    L.circleMarker([origin.lat, origin.lng], {
+      radius: 7,
+      color: "#86d5b3",
+      fillColor: "#86d5b3",
+      fillOpacity: 0.95,
+      weight: 2,
+    })
+      .addTo(watchMap)
+      .bindPopup(`<strong>Starting point</strong><br>${escapeHTML(watchData.origin)}`);
+
+    L.marker([destination.lat, destination.lng])
+      .addTo(watchMap)
+      .bindPopup(`<strong>Destination</strong><br>${escapeHTML(watchData.destination)}`);
+
+    const route = L.polyline(
+      [
+        [origin.lat, origin.lng],
+        [destination.lat, destination.lng],
+      ],
+      { color: "#d4935d", weight: 3, opacity: 0.8, dashArray: "8 6" }
+    ).addTo(watchMap);
+
+    try {
+      watchMap.fitBounds(route.getBounds(), { padding: [28, 28], maxZoom: 14 });
+    } catch {
+      /* Identical coordinates can make bounds invalid. */
+    }
+    window.setTimeout(() => {
+      if (watchMap) watchMap.invalidateSize();
+    }, 100);
+  }
+
+  async function geocodePlace(query) {
+    if (!query || !window.fetch) return null;
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
+        { headers: { Accept: "application/json" } }
+      );
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (Array.isArray(data) && data.length && data[0].lat && data[0].lon) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+    } catch {
+      /* Geocoding can fail on slow or restricted networks. */
+    }
+    return null;
+  }
+
+  async function fetchRoadRoute(origin, destination, apiKey) {
+    if (!origin || !destination || !apiKey) return null;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${encodeURIComponent(
+        apiKey
+      )}&start=${origin.lng},${origin.lat}&end=${destination.lng},${destination.lat}`;
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) return null;
+      const data = await response.json();
+      const coordinates = data?.features?.[0]?.geometry?.coordinates;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+      return coordinates.map((point) => [point[1], point[0]]);
+    } catch {
+      return null;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  async function ensureJourneyCoords(journey) {
+    if (!journey) return null;
+
+    if (!journey.originCoords) {
+      if (navigator.geolocation) {
+        journey.originCoords = await new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              });
+            },
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+          );
+        });
+      }
+      if (!journey.originCoords) {
+        journey.originCoords = { ...DEFAULT_MAP_CENTER };
+      }
+    }
+
+    if (!journey.destinationCoords) {
+      const found = await geocodePlace(journey.destination);
+      journey.destinationCoords = found || {
+        lat: journey.originCoords.lat + 0.035,
+        lng: journey.originCoords.lng + 0.045,
+      };
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      /* Ignore storage restrictions. */
+    }
+    return journey;
+  }
+
+  async function updateJourneyMap() {
+    if (!state?.journey || !window.L) return;
+    const container = document.getElementById("journeyMap");
+    if (!container) return;
+    if (journeyMapUpdating) return;
+    journeyMapUpdating = true;
+
+    try {
+      if (!journeyMap) {
+        journeyMap = L.map(container, {
+          zoomControl: true,
+          attributionControl: true,
+        }).setView([DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng], 12);
+
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+          subdomains: "abcd",
+          maxZoom: 20,
+        }).addTo(journeyMap);
+      }
+
+      const journey = await ensureJourneyCoords(state.journey);
+      if (!journey || !journeyMap) return;
+
+      journeyMapMarkers.forEach((layer) => journeyMap.removeLayer(layer));
+      journeyMapMarkers = [];
+      if (journeyMapRoute) {
+        journeyMap.removeLayer(journeyMapRoute);
+        journeyMapRoute = null;
+      }
+      if (journeyMapUserMarker) {
+        journeyMap.removeLayer(journeyMapUserMarker);
+        journeyMapUserMarker = null;
+      }
+
+      const origin = journey.originCoords;
+      const destination = journey.destinationCoords;
+
+      journeyMapUserMarker = L.circleMarker([origin.lat, origin.lng], {
+        radius: 8,
+        color: "#86d5b3",
+        fillColor: "#86d5b3",
+        fillOpacity: 0.95,
+        weight: 2,
+      })
+        .addTo(journeyMap)
+        .bindPopup(`<strong>Starting point</strong><br>${escapeHTML(journey.origin || "Current location")}`);
+
+      const destinationMarker = L.marker([destination.lat, destination.lng])
+        .addTo(journeyMap)
+        .bindPopup(`<strong>Destination</strong><br>${escapeHTML(journey.destination)}`);
+      journeyMapMarkers.push(destinationMarker);
+
+      const apiKey = getRoutingApiKey();
+      let routeCoordinates = [
+        [origin.lat, origin.lng],
+        [destination.lat, destination.lng],
+      ];
+      const roadRoute = await fetchRoadRoute(origin, destination, apiKey);
+      if (roadRoute) routeCoordinates = roadRoute;
+
+      journeyMapRoute = L.polyline(routeCoordinates, {
+        color: roadRoute ? "#ef3657" : "#ef3657",
+        weight: 4,
+        opacity: 0.82,
+        dashArray: roadRoute ? null : "8 6",
+      }).addTo(journeyMap);
+
+      try {
+        journeyMap.fitBounds(journeyMapRoute.getBounds(), {
+          padding: [34, 34],
+          maxZoom: 15,
+        });
+      } catch {
+        /* Bounds can fail if coordinates are identical. */
+      }
+
+      updateMapChip(getJourneyStatus().key);
+    } catch (error) {
+      console.warn("Safe Route map could not load.", error);
+    } finally {
+      journeyMapUpdating = false;
+      if (journeyMap) journeyMap.invalidateSize();
+    }
+  }
+
+  function updateMapChip(statusKey) {
+    const chip = document.querySelector(".map-chip");
+    const chipText = document.getElementById("mapChipText");
+    if (!chip || !chipText) return;
+    chip.classList.remove("is-warn", "is-alert");
+    if (statusKey === "due") {
+      chip.classList.add("is-warn");
+      chipText.textContent = "Check-in due";
+    } else if (statusKey === "overdue") {
+      chip.classList.add("is-alert");
+      chipText.textContent = "Check in now";
+    } else {
+      chipText.textContent = "Live route";
+    }
   }
 
   function renderJourney() {
@@ -530,6 +782,7 @@
       if (endButton) endButton.hidden = true;
       if (demoBadge) demoBadge.hidden = true;
       if (journeyId) journeyId.textContent = "—";
+      cleanupJourneyMap();
       lastJourneyStatus = "idle";
       applyJourneyStatusChrome({ key: "idle", label: "No active route", notice: null });
       renderSystemState("idle");
@@ -547,8 +800,11 @@
     $("#originText").textContent = journey.origin || "Current location";
     $("#etaText").textContent = formatTime(journey.expectedAt);
     $("#intervalText").textContent = `${Math.round(journey.checkInInterval / MINUTE)} min`;
-    $("#routeProgress").style.strokeDasharray = "100 100";
     $("#contactNameInline").textContent = state.contact?.name?.split(" ")[0] || "Contact";
+
+    window.requestAnimationFrame(() => {
+      if (state?.journey?.status === "active") updateJourneyMap();
+    });
 
     renderContact();
     const status = getJourneyStatus();
@@ -562,6 +818,7 @@
   function renderActivities() {
     const container = $("#activityList");
     const count = $("#activityCount");
+    const viewAllButton = $("#viewAllActivityButton");
     if (!container) return;
 
     const activities = [...(state?.activities || [])].sort((a, b) => b.at - a.at);
@@ -570,6 +827,7 @@
         activities.length === 1 ? "event" : "events"
       }`;
     }
+    if (viewAllButton) viewAllButton.hidden = activities.length === 0;
 
     if (!activities.length) {
       container.innerHTML = `<p class="activity-empty">Your check-ins and shared routes will appear here.</p>`;
@@ -596,12 +854,55 @@
       .join("");
   }
 
+  function openActivityModal() {
+    if (!state) return;
+    const activities = [...(state.activities || [])].sort((a, b) => b.at - a.at);
+    openModal(
+      `
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Safety history</p>
+          <h2 class="modal-title">Everything in one place.</h2>
+        </div>
+        ${modalCloseButton()}
+      </div>
+      <p class="modal-lede">${activities.length} ${
+        activities.length === 1 ? "event" : "events"
+      } saved in this browser, newest first.</p>
+      <div class="history-list">
+        ${
+          activities.length
+            ? activities
+                .map(
+                  (activity) => `
+            <div class="activity-row">
+              <span class="activity-icon type-${escapeHTML(activity.type)}">${
+                activityIcons[activity.type] || icons.route
+              }</span>
+              <div class="activity-copy">
+                <strong>${escapeHTML(activity.title)}</strong>
+                <p>${escapeHTML(activity.detail)}</p>
+              </div>
+              <time class="activity-time" datetime="${new Date(activity.at).toISOString()}">${escapeHTML(
+                formatShortDate(activity.at)
+              )} · ${escapeHTML(formatTime(activity.at))}</time>
+            </div>`
+                )
+                .join("")
+            : `<p class="activity-empty">No safety events have been recorded yet.</p>`
+        }
+      </div>`,
+      "modal-wide"
+    );
+  }
+
   function renderAll() {
     updateClock();
     if (!state) return;
     renderJourney();
     renderContact();
     renderActivities();
+    applyEmergencyLinks();
     updateNotificationState();
     updateDocumentMeta();
   }
@@ -761,6 +1062,9 @@
       checkInInterval: journey.checkInInterval,
       startedAt: journey.startedAt,
       sharedAt: Date.now(),
+      emergencyNumber: getEmergencyNumber(),
+      originCoords: journey.originCoords || null,
+      destinationCoords: journey.destinationCoords || null,
     };
   }
 
@@ -812,6 +1116,9 @@
         checkInInterval: Number(payload.checkInInterval) || 15 * MINUTE,
         startedAt: Number(payload.startedAt) || Number(payload.lastCheckIn),
         sharedAt: Number(payload.sharedAt) || Date.now(),
+        emergencyNumber: sanitizeEmergencyNumber(payload.emergencyNumber),
+        originCoords: payload.originCoords || null,
+        destinationCoords: payload.destinationCoords || null,
       };
     } catch {
       return { error: true };
@@ -852,9 +1159,11 @@
 
   function renderWatchPage() {
     if (!watchData) return;
+    cleanupWatchMap();
     const traveler = watchData.traveler || "Your person";
     const firstName = traveler.split(" ")[0];
     const status = watchStatus(Date.now());
+    const watchEmergency = sanitizeEmergencyNumber(watchData.emergencyNumber);
     const sharedLabel = watchData.live
       ? "Live on this device"
       : `Shared ${formatTime(watchData.sharedAt)}`;
@@ -903,6 +1212,8 @@
               <span class="watch-stop is-end">${escapeHTML(watchData.destination)}</span>
             </div>
 
+            <div id="watchMap" class="watch-map" aria-label="Shared route map"></div>
+
             <div class="watch-countdown-row">
               <div>
                 <p class="eyebrow" id="watchCountdownLabel">Arriving in</p>
@@ -942,7 +1253,7 @@
 
         <div class="watch-emergency">
           <p><strong>If you believe ${escapeHTML(firstName)} is in immediate danger</strong>Call local emergency services. Do not wait for a check-in.</p>
-          <a href="tel:${EMERGENCY_NUMBER}">Call ${EMERGENCY_NUMBER}</a>
+          <a href="tel:${watchEmergency}">Call ${watchEmergency}</a>
         </div>
 
         <footer class="watch-footer">
@@ -952,6 +1263,9 @@
       </div>`;
 
     lastWatchStatus = null;
+    window.setTimeout(() => {
+      if (watchData) initWatchMap();
+    }, 0);
     updateWatchLive();
   }
 
@@ -1049,7 +1363,7 @@
     modalReturnFocus = document.activeElement;
     modalRoot.innerHTML = `
       <div class="modal-backdrop">
-        <section class="modal ${className}" role="dialog" aria-modal="true" aria-label="Safe Route dialog">
+        <section class="modal ${className}" role="dialog" aria-modal="true" aria-label="Safe Route dialog" tabindex="-1">
           ${content}
         </section>
       </div>`;
@@ -1281,6 +1595,7 @@
 
   function openProfileModal() {
     const user = state?.user || { name: "Alex Rivera" };
+    const emergencyNumber = getEmergencyNumber();
     openModal(
       `
       <div class="modal-head">
@@ -1295,12 +1610,53 @@
         <div class="contact-avatar">${escapeHTML(initials(user.name))}</div>
         <div><strong>${escapeHTML(user.name)}</strong><span>Local profile · data stays on this device</span></div>
       </div>
+      <form class="emergency-setting" id="emergencySettingsForm">
+        <div class="emergency-setting-copy">
+          <strong>Local emergency number</strong>
+          <p>Used on every SOS screen and trusted-contact view. Confirm the correct number for your country.</p>
+        </div>
+        <div class="emergency-setting-control">
+          <input type="tel" name="emergencyNumber" value="${escapeHTML(emergencyNumber)}" maxlength="8" aria-label="Local emergency number">
+          <button class="button button-outline" type="submit">Save</button>
+        </div>
+      </form>
+      <form class="emergency-setting" id="routingKeyForm">
+        <div class="emergency-setting-copy">
+          <strong>Free routing API key</strong>
+          <p>Optional OpenRouteService key for real road routes. Leave blank to use the direct-line fallback.</p>
+        </div>
+        <div class="emergency-setting-control">
+          <input type="text" name="routingApiKey" value="${escapeHTML(getRoutingApiKey())}" maxlength="120" aria-label="OpenRouteService API key" placeholder="ors-...">
+          <button class="button button-outline" type="submit">Save</button>
+        </div>
+      </form>
       <div class="confirm-actions">
         <button class="button button-outline" type="button" id="settingsNotifyButton">${icons.bell}<span>Enable check-in reminders</span></button>
         <button class="button button-outline" type="button" id="settingsContactButton">${icons.shield}<span>Edit trusted contact</span></button>
         <button class="button button-quiet" type="button" id="settingsResetButton">Reset sample journey</button>
       </div>`
     );
+
+    $("#emergencySettingsForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const value = sanitizeEmergencyNumber(new FormData(event.currentTarget).get("emergencyNumber"));
+      state.emergencyNumber = value;
+      saveState();
+      applyEmergencyLinks();
+      renderAll();
+      showToast(`Emergency number updated to ${value}.`);
+    });
+
+    $("#routingKeyForm")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      state.routingApiKey = String(new FormData(event.currentTarget).get("routingApiKey") || "").trim();
+      saveState();
+      if (state?.journey?.status === "active") {
+        cleanupJourneyMap();
+        renderJourney();
+      }
+      showToast(state.routingApiKey ? "Routing key saved. Real road routes will load now." : "Routing key cleared. Using direct-line routes.");
+    });
 
     $("#settingsNotifyButton")?.addEventListener("click", () => {
       closeModal(false);
@@ -1602,6 +1958,7 @@
     const contact = state?.contact || createDemoState().contact;
     const phone = sanitizePhone(contact.phone);
     const journey = state?.journey;
+    const emergencyNumber = getEmergencyNumber();
     const locationContext = journey
       ? `I may need help. I'm on my way from ${journey.origin} to ${journey.destination}. Expected arrival was ${formatTime(
           journey.expectedAt
@@ -1620,7 +1977,7 @@
       <h2 class="modal-title">Help is one<br>tap away.</h2>
       <p class="sos-lede">No call has been placed and nothing has been shared yet. Choose what you need. Your safety is the priority.</p>
 
-      <a class="emergency-primary" href="tel:${EMERGENCY_NUMBER}" id="sosCallLink">
+      <a class="emergency-primary" href="tel:${emergencyNumber}" id="sosCallLink">
         <span><small>Immediate danger</small><strong>Call emergency services</strong></span>
         <span class="arrow-circle">${icons.phone}</span>
       </a>
@@ -1642,7 +1999,7 @@
     );
 
     $("#sosCallLink")?.addEventListener("click", () => {
-      addActivity("sos", "Emergency call opened", `Dialer opened for ${EMERGENCY_NUMBER}.`);
+      addActivity("sos", "Emergency call opened", `Dialer opened for ${emergencyNumber}.`);
       renderActivities();
     });
 
@@ -1760,6 +2117,31 @@
     }
   }
 
+  /* ---------- Modal focus ---------- */
+
+  function trapFocus(event) {
+    if (event.key !== "Tab" || !modalRoot.innerHTML) return;
+    const modal = modalRoot.querySelector(".modal");
+    if (!modal) return;
+    const focusable = $$("a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex='-1'])", modal).filter((element) => {
+      return element.offsetParent !== null || element === document.activeElement;
+    });
+    if (!focusable.length) {
+      event.preventDefault();
+      modal.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   /* ---------- Events ---------- */
 
   function bindEvents() {
@@ -1778,6 +2160,7 @@
       window.location.href = `sms:${phone}?&body=${encodeURIComponent("Just checking in — all good?")}`;
     });
     $("#resetDemoButton")?.addEventListener("click", openResetModal);
+    $("#viewAllActivityButton")?.addEventListener("click", openActivityModal);
 
     document.addEventListener("click", (event) => {
       const checkInTrigger = event.target.closest('[data-action="checkin"]');
@@ -1807,6 +2190,8 @@
         closeModal();
       }
     });
+
+    document.addEventListener("keydown", trapFocus);
 
     window.addEventListener("hashchange", () => {
       if (window.location.hash.startsWith("#watch=")) {

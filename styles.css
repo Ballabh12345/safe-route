@@ -859,9 +859,47 @@ svg {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background:
-    radial-gradient(75% 85% at 72% 35%, rgba(164, 21, 52, 0.16), transparent 68%),
-    linear-gradient(140deg, #10090b, #0b0709);
+  background: #0b0608;
+}
+
+.journey-map {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+}
+
+.leaflet-container {
+  background: #0b0608;
+  font-family: var(--body);
+}
+
+.leaflet-control-attribution {
+  background: rgba(11, 6, 8, 0.72) !important;
+  color: var(--muted) !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--amber) !important;
+}
+
+.leaflet-bar a {
+  background: rgba(17, 10, 13, 0.92) !important;
+  color: var(--text-soft) !important;
+  border-color: var(--line) !important;
+}
+
+.leaflet-bar a:hover {
+  background: rgba(27, 16, 20, 0.96) !important;
+  color: var(--text) !important;
+}
+
+.map-chip {
+  position: absolute;
+  top: 17px;
+  left: 17px;
+  z-index: 1000;
+  ...
 }
 
 .map-grid {
@@ -961,7 +999,7 @@ svg {
   position: absolute;
   top: 17px;
   left: 17px;
-  z-index: 2;
+  z-index: 1000;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1125,6 +1163,30 @@ svg {
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.activity-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding-bottom: 3px;
+}
+
+.activity-head-actions .event-count {
+  padding-bottom: 0;
+}
+
+.history-list {
+  border-top: 1px solid var(--line);
+}
+
+.history-list .activity-row {
+  min-height: 62px;
+}
+
+.history-list time {
+  min-width: 88px;
+  text-align: right;
 }
 
 .activity-list {
@@ -2070,6 +2132,63 @@ svg {
   width: 100%;
 }
 
+.emergency-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 15px;
+  align-items: end;
+  margin-bottom: 15px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(244, 236, 226, 0.02);
+}
+
+.emergency-setting-copy strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.emergency-setting-copy p {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.emergency-setting-control {
+  display: flex;
+  gap: 7px;
+}
+
+.emergency-setting-control input {
+  width: 86px;
+  height: 37px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--text);
+  background: rgba(10, 5, 7, 0.56);
+  font-family: var(--mono);
+  font-size: 10px;
+  outline: none;
+}
+
+.emergency-setting-control input:focus {
+  border-color: rgba(212, 147, 93, 0.58);
+}
+
+.emergency-setting-control .button {
+  min-height: 37px;
+  padding: 0 12px;
+  font-size: 8px;
+}
+
 .button-quiet {
   color: var(--muted);
   background: transparent;
@@ -2581,13 +2700,13 @@ body.watch-mode .sos-dock {
   font-weight: 600;
 }
 
-.watch-route-track {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 4px 32px;
-  padding-top: 2px;
+.watch-map {
+  height: 220px;
+  margin: 0 0 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #0b0608;
 }
 
 .watch-route-track::before {
@@ -3321,8 +3440,19 @@ body.watch-mode .sos-dock {
     padding: 21px 16px 8px;
   }
 
+  .activity-head {
+    align-items: flex-start;
+  }
+
   .activity-head h2 {
     font-size: 29px;
+  }
+
+  .activity-head-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+    padding-bottom: 0;
   }
 
   .event-count {
@@ -3452,6 +3582,16 @@ body.watch-mode .sos-dock {
 
   .sos-cancel {
     margin-top: 9px;
+  }
+
+  .emergency-setting {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .emergency-setting-control input {
+    flex: 1;
+    width: auto;
   }
 
   .toast-region {
