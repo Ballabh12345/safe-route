@@ -550,10 +550,9 @@
       [origin.lat, origin.lng],
       12
     );
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      subdomains: "abcd",
-      maxZoom: 20,
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19,
     }).addTo(watchMap);
 
     L.circleMarker([origin.lat, origin.lng], {
@@ -566,7 +565,13 @@
       .addTo(watchMap)
       .bindPopup(`<strong>Starting point</strong><br>${escapeHTML(watchData.origin)}`);
 
-    L.marker([destination.lat, destination.lng])
+    L.circleMarker([destination.lat, destination.lng], {
+      radius: 7,
+      color: "#ff4765",
+      fillColor: "#ff4765",
+      fillOpacity: 0.95,
+      weight: 2,
+    })
       .addTo(watchMap)
       .bindPopup(`<strong>Destination</strong><br>${escapeHTML(watchData.destination)}`);
 
@@ -680,10 +685,9 @@
           attributionControl: true,
         }).setView([DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng], 12);
 
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-          subdomains: "abcd",
-          maxZoom: 20,
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+          maxZoom: 19,
         }).addTo(journeyMap);
       }
 
@@ -714,7 +718,13 @@
         .addTo(journeyMap)
         .bindPopup(`<strong>Starting point</strong><br>${escapeHTML(journey.origin || "Current location")}`);
 
-      const destinationMarker = L.marker([destination.lat, destination.lng])
+      const destinationMarker = L.circleMarker([destination.lat, destination.lng], {
+        radius: 8,
+        color: "#ff4765",
+        fillColor: "#ff4765",
+        fillOpacity: 0.95,
+        weight: 2,
+      })
         .addTo(journeyMap)
         .bindPopup(`<strong>Destination</strong><br>${escapeHTML(journey.destination)}`);
       journeyMapMarkers.push(destinationMarker);
@@ -1212,7 +1222,7 @@
               <span class="watch-stop is-end">${escapeHTML(watchData.destination)}</span>
             </div>
 
-            <div id="watchMap" class="watch-map" aria-label="Shared route map"></div>
+            <div id="watchMap" class="watch-map" style="min-height:220px;height:220px;" aria-label="Shared route map"></div>
 
             <div class="watch-countdown-row">
               <div>
