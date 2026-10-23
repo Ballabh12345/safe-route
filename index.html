@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0608">
+  <meta name="description" content="Safe Route is a personal safety companion for sharing journeys, checking in, and keeping trusted contacts informed.">
+  <title>Safe Route — Your journey, watched over</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+
+  <div class="app-shell" id="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#top" aria-label="Safe Route home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" role="img">
+              <circle cx="20" cy="20" r="20" fill="#d4935d"/>
+              <path d="M9 19.5C9 13.7 13.9 9 20 9s11 4.7 11 10.5H9Z" fill="none" stroke="#160b0d" stroke-width="2.2"/>
+              <path d="M20 19.5v8.7a3.7 3.7 0 0 0 7.4 0v-1.5" fill="none" stroke="#160b0d" stroke-width="2.2" stroke-linecap="round"/>
+              <path d="M20 9v10.5" stroke="#160b0d" stroke-width="1.2" opacity=".45"/>
+            </svg>
+          </span>
+          <span class="brand-type">
+            <strong>Safe Route</strong>
+            <small>Journey companion</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Primary navigation">
+          <a class="nav-link is-active" href="#journey">Journey</a>
+          <a class="nav-link" href="#activity">Activity</a>
+          <button class="nav-link" type="button" id="navContacts">Contacts</button>
+        </nav>
+
+        <div class="topbar-actions">
+          <span class="system-state" id="systemState">
+            <span class="status-dot"></span>
+            <span id="systemStateText">Route live</span>
+          </span>
+          <button class="icon-button" type="button" id="notifyButton" aria-label="Enable check-in reminders" title="Enable check-in reminders">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="notify-dot" id="notifyDot" hidden></span>
+          </button>
+          <button class="avatar" type="button" id="profileButton" aria-label="Open settings">AR</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="page" id="top">
+      <section class="intro" aria-labelledby="pageTitle">
+        <div class="intro-copy">
+          <p class="eyebrow intro-eyebrow">
+            <span id="currentDate">Friday, 23 October</span>
+            <span class="eyebrow-divider">/</span>
+            <span id="currentClock">21:42</span>
+          </p>
+          <h1 id="pageTitle">Your route,<br><span>watched over.</span></h1>
+        </div>
+        <div class="intro-aside">
+          <p>Share the journey. Check in on time. Keep your people close, even when you’re on the move.</p>
+          <button class="button button-primary" type="button" id="newRouteButton">
+            <span>Start a safe route</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <div class="dashboard">
+        <div class="main-column">
+          <article class="panel journey-panel" id="journey" aria-live="polite">
+            <div class="journey-head">
+              <div class="journey-flag">
+                <span class="live-dot" id="journeyDot"></span>
+                <span id="journeyStatusLabel">Live journey</span>
+                <span class="journey-id" id="journeyId">SR–2481</span>
+              </div>
+              <div class="journey-head-actions">
+                <span class="demo-badge" id="demoBadge">Sample route</span>
+                <button class="text-button" type="button" id="endJourneyButton">End route</button>
+              </div>
+            </div>
+
+            <div class="journey-notice" id="journeyNotice" hidden></div>
+
+            <div class="journey-active" id="journeyActive">
+              <div class="journey-grid">
+                <div class="journey-summary">
+                  <div class="destination-block">
+                    <p class="eyebrow">En route to</p>
+                    <h2 id="destinationText">Riverside Station</h2>
+                    <p class="origin-line">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4"/><circle cx="8" cy="8" r="7"/></svg>
+                      From <span id="originText">Hawthorne Ave</span>
+                    </p>
+                  </div>
+
+                  <div class="journey-stats">
+                    <div class="stat">
+                      <span class="stat-label">ETA</span>
+                      <strong id="etaText">21:28</strong>
+                      <small id="etaSub">in 27 min</small>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-label">Check-in</span>
+                      <strong id="intervalText">15 min</strong>
+                      <small id="checkinDueText">due at 21:12</small>
+                    </div>
+                    <div class="stat">
+                      <span class="stat-label">Shared with</span>
+                      <strong id="contactNameInline">Maya</strong>
+                      <small>trusted contact</small>
+                    </div>
+                  </div>
+
+                  <div class="countdown-block">
+                    <div class="countdown-copy">
+                      <span class="eyebrow" id="countdownLabel">Arriving in</span>
+                      <strong class="countdown-time" id="countdownText">00:27:43</strong>
+                    </div>
+                    <div class="countdown-track" aria-hidden="true">
+                      <span id="journeyProgressBar"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="route-map" aria-label="Stylised route map">
+                  <div class="map-grid" aria-hidden="true"></div>
+                  <svg class="map-svg" viewBox="0 0 620 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    <g class="map-streets">
+                      <path d="M-40 70 C 100 90, 160 20, 300 55 S 490 100, 680 35"/>
+                      <path d="M-20 150 C 100 120, 230 195, 330 150 S 500 110, 660 160"/>
+                      <path d="M80 -20 C 70 100, 150 180, 140 360"/>
+                      <path d="M270 -20 C 290 90, 220 200, 260 360"/>
+                      <path d="M450 -30 C 420 80, 500 210, 440 370"/>
+                      <path d="M-40 260 C 130 220, 230 310, 360 260 S 550 220, 680 285"/>
+                      <path d="M560 -20 C 540 90, 600 160, 570 360"/>
+                    </g>
+                    <path class="route-base" d="M70 278 C 140 278, 160 230, 225 220 S 305 265, 348 214 S 380 129, 466 120 S 515 77, 560 66" pathLength="100"/>
+                    <path class="route-progress" id="routeProgress" d="M70 278 C 140 278, 160 230, 225 220 S 305 265, 348 214 S 380 129, 466 120 S 515 77, 560 66" pathLength="100"/>
+                    <circle class="route-waypoint" cx="70" cy="278" r="5"/>
+                    <circle class="route-waypoint" cx="560" cy="66" r="6"/>
+                    <circle class="route-pulse" id="routePulse" cx="348" cy="214" r="18"/>
+                    <circle class="route-dot" id="routeDot" cx="348" cy="214" r="8"/>
+                  </svg>
+                  <span class="map-label map-label-origin">Hawthorne Ave</span>
+                  <span class="map-label map-label-dest">Riverside Station</span>
+                  <span class="map-chip"><span class="status-dot"></span><span id="mapChipText">On track</span></span>
+                  <span class="map-compass" aria-hidden="true">N<span>↑</span></span>
+                </div>
+              </div>
+
+              <div class="journey-footer">
+                <div class="journey-actions">
+                  <button class="button button-checkin" type="button" id="checkinButton">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.4 3.4L15.5 6"/></svg>
+                    <span>Check in</span>
+                  </button>
+                  <button class="button button-outline" type="button" id="shareButton">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="15" cy="4.5" r="2.3"/><circle cx="5" cy="10" r="2.3"/><circle cx="15" cy="15.5" r="2.3"/><path d="m7 9 5.8-3.3M7 11l5.8 3.3"/></svg>
+                    <span>Share live route</span>
+                  </button>
+                </div>
+                <p class="last-checkin" id="lastCheckinText">Checked in 6 min ago</p>
+              </div>
+            </div>
+
+            <div class="journey-empty" id="journeyEmpty" hidden>
+              <span class="empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M3 11.5 21 4l-3.6 16-5.7-5.1L3 11.5Z"/><path d="m11.7 14.9 4.5-6.1"/></svg>
+              </span>
+              <p class="eyebrow">No route in progress</p>
+              <h2>Where are you headed?</h2>
+              <p>Set a destination, an arrival time, and who should know. It takes less than a minute.</p>
+              <button class="button button-primary" type="button" id="emptyStartButton">
+                <span>Set up a route</span>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+              </button>
+            </div>
+          </article>
+
+          <section class="panel activity-panel" id="activity" aria-labelledby="activityTitle">
+            <div class="activity-head">
+              <div>
+                <p class="eyebrow">Safety history</p>
+                <h2 id="activityTitle">Every check, logged.</h2>
+              </div>
+              <span class="event-count" id="activityCount">04 events</span>
+            </div>
+            <div class="activity-list" id="activityList"></div>
+          </section>
+        </div>
+
+        <aside class="side-column">
+          <article class="panel contact-panel" id="contacts">
+            <div class="panel-heading">
+              <p class="eyebrow">Your safety circle</p>
+              <button class="text-button" type="button" id="editContactButton">Edit</button>
+            </div>
+            <div class="contact-identity">
+              <div class="contact-avatar" id="contactAvatar">MC<span class="contact-online" title="Available"></span></div>
+              <div>
+                <h3 id="contactNameCard">Maya Chen</h3>
+                <p id="contactRelation">Sister · Primary contact</p>
+              </div>
+            </div>
+            <div class="contact-actions">
+              <a class="mini-action" id="callContact" href="tel:+14155550184">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.7 3H4.4A1.4 1.4 0 0 0 3 4.4c0 7 5.6 12.6 12.6 12.6a1.4 1.4 0 0 0 1.4-1.4v-2.3l-3.4-1.1-1.5 1.8a10 10 0 0 1-4.1-4.1L9.8 8 6.7 3Z"/></svg>
+                Call
+              </a>
+              <button class="mini-action" type="button" id="textContact">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M17 12.2a2.2 2.2 0 0 1-2.2 2.2H6l-3 2.2V4.8A2.2 2.2 0 0 1 5.2 2.6h9.6A2.2 2.2 0 0 1 17 4.8v7.4Z"/></svg>
+                Message
+              </button>
+            </div>
+            <p class="contact-note">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13.3 4v3.6c0 3.1-2.2 5.6-5.3 6.6-3.1-1-5.3-3.5-5.3-6.6V4L8 1.8Z"/><path d="m5.7 7.8 1.5 1.5 3.2-3.2"/></svg>
+              Your private-link contact for every journey.
+            </p>
+          </article>
+
+          <article class="panel toolkit-panel">
+            <div class="panel-heading">
+              <p class="eyebrow">Quick actions</p>
+              <span class="safe-badge">Ready</span>
+            </div>
+            <div class="toolkit-list">
+              <button class="toolkit-row" type="button" id="toolkitShareButton">
+                <span class="toolkit-icon">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="15" cy="4.5" r="2.3"/><circle cx="5" cy="10" r="2.3"/><circle cx="15" cy="15.5" r="2.3"/><path d="m7 9 5.8-3.3M7 11l5.8 3.3"/></svg>
+                </span>
+                <span class="toolkit-copy"><strong>Share live route</strong><small>Copy a private tracking link</small></span>
+                <svg class="toolkit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+              </button>
+              <a class="toolkit-row" id="toolkitMessage" href="sms:+14155550184">
+                <span class="toolkit-icon">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M17 12.2a2.2 2.2 0 0 1-2.2 2.2H6l-3 2.2V4.8A2.2 2.2 0 0 1 5.2 2.6h9.6A2.2 2.2 0 0 1 17 4.8v7.4Z"/></svg>
+                </span>
+                <span class="toolkit-copy"><strong>Message Maya</strong><small>Send a quick safety check</small></span>
+                <svg class="toolkit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+              </a>
+              <a class="toolkit-row" href="tel:112">
+                <span class="toolkit-icon toolkit-icon-alert">
+                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 19 18H1L10 2Z"/><path d="M10 7v5M10 15.2v.1"/></svg>
+                </span>
+                <span class="toolkit-copy"><strong>Local emergency line</strong><small>Call 112 · always available</small></span>
+                <svg class="toolkit-arrow" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg>
+              </a>
+            </div>
+            <p class="toolkit-note">For immediate danger, hold the SOS button for three seconds.</p>
+          </article>
+
+          <aside class="tip-card">
+            <span class="tip-index">Safety note / 01</span>
+            <p>“A two-second check-in can save a two-hour search.”</p>
+            <span class="tip-foot">Keep your circle in the loop.</span>
+          </aside>
+        </aside>
+      </div>
+
+      <footer class="page-footer">
+        <span>SAFE ROUTE <span class="footer-dot">●</span> PERSONAL SAFETY COMPANION</span>
+        <span class="footer-center">Prototype experience · No emergency service is contacted automatically.</span>
+        <button class="footer-reset" type="button" id="resetDemoButton">Reset sample</button>
+      </footer>
+    </main>
+  </div>
+
+  <div class="sos-dock">
+    <span class="sos-hint">Hold 3s for help</span>
+    <button class="sos-button" type="button" id="sosButton" aria-label="Hold for three seconds to open emergency actions">
+      <span class="sos-button-ring" aria-hidden="true"></span>
+      <span class="sos-button-inner">
+        <span class="sos-kicker">Hold</span>
+        <strong>SOS</strong>
+      </span>
+    </button>
+  </div>
+
+  <section class="watch-view" id="watchView" hidden></section>
+  <div id="modalRoot"></div>
+  <div class="toast-region" id="toastRoot" aria-live="polite"></div>
+
+  <noscript><div class="noscript">Safe Route needs JavaScript to run. Please enable it in your browser.</div></noscript>
+  <script src="./app.js"></script>
+</body>
+</html>
